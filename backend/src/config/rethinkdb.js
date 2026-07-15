@@ -2,7 +2,7 @@ import rethinkdbdash from 'rethinkdbdash';
 
 export const databaseName = process.env.RETHINKDB_DB || 'vekan';
 
-const servers = (process.env.RETHINKDB_SERVERS || '127.0.0.1:28015')
+export const databaseServers = (process.env.RETHINKDB_SERVERS || '127.0.0.1:28015')
   .split(',')
   .map((server) => {
     const [host, port = '28015'] = server.trim().split(':');
@@ -10,7 +10,7 @@ const servers = (process.env.RETHINKDB_SERVERS || '127.0.0.1:28015')
   });
 
 const options = {
-  servers,
+  servers: databaseServers,
   db: databaseName,
   silent: true,
   timeout: Number(process.env.RETHINKDB_TIMEOUT) || 20,
