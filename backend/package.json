@@ -7,7 +7,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/init/run.js",
-    "check": "node --check src/server.js && node --check src/config/rethinkdb.js && node --check src/api/rest/auth.js && node --check src/api/rest/company.js && node --check src/api/rest/invoice.js && node --check src/api/rest/user.js && node --check src/logic/auth.js && node --check src/logic/company.js && node --check src/logic/invoice.js && node --check src/logic/user.js && node --check src/models/invoiceModel.js && node --check src/models/companyModel.js && node --check src/models/userModel.js && node --check src/init/index.js && node --check src/init/run.js && node --check src/init/scripts/004-create-users-and-seed-super-admin.js && node --check src/init/scripts/005-enable-invoice-soft-delete.js"
+    "check": "node --check src/server.js && node --check src/config/rethinkdb.js && node --check src/api/rest/auth.js && node --check src/api/rest/company.js && node --check src/api/rest/invoice.js && node --check src/api/rest/setting.js && node --check src/api/rest/user.js && node --check src/logic/auth.js && node --check src/logic/company.js && node --check src/logic/invoice.js && node --check src/logic/setting.js && node --check src/logic/user.js && node --check src/models/invoiceModel.js && node --check src/models/companyModel.js && node --check src/models/settingModel.js && node --check src/models/userModel.js && node --check src/init/index.js && node --check src/init/run.js && node --check src/init/scripts/004-create-users-and-seed-super-admin.js && node --check src/init/scripts/005-enable-invoice-soft-delete.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

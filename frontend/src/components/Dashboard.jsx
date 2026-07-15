@@ -6,6 +6,7 @@ import {
   Files,
   Flame,
   LogOut,
+  Settings2,
   ShieldCheck,
   UsersRound,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import { apiFetch } from '../api';
 import InvoiceEditor from './InvoiceEditor';
 import ViewInvoices from './ViewInvoices';
 import Companies from './Companies';
+import AppSettings from './AppSettings';
 import Users from './Users';
 
 const navClass = ({ isActive }) => `nav-link${isActive ? ' nav-link-active' : ''}`;
@@ -44,6 +46,7 @@ export default function Dashboard() {
           <NavLink to="/dashboard/create" className={navClass}><FilePlus2 size={18} />Create invoice</NavLink>
           <NavLink to="/dashboard/companies" className={navClass}><Building2 size={18} />Companies</NavLink>
           {isSuperAdmin && <NavLink to="/dashboard/users" className={navClass}><UsersRound size={18} />Users</NavLink>}
+          {isAdmin && <NavLink to="/dashboard/settings" className={navClass}><Settings2 size={18} />App settings</NavLink>}
           {isAdmin && <NavLink to="/dashboard/admin" className={navClass}><ShieldCheck size={18} />Admin approvals</NavLink>}
         </nav>
 
@@ -65,6 +68,7 @@ export default function Dashboard() {
             <Route path="/create" element={<InvoiceEditor />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/users" element={isSuperAdmin ? <Users /> : <div className="glass-panel"><h2>Access denied</h2></div>} />
+            <Route path="/settings" element={isAdmin ? <AppSettings /> : <div className="glass-panel"><h2>Access denied</h2></div>} />
             <Route path="/admin" element={<div className="glass-panel"><span className="eyebrow">Administration</span><h2>Admin approvals</h2><p>Pending user approvals will appear here.</p></div>} />
           </Routes>
         </div>

@@ -1,7 +1,10 @@
 import { r } from '../config/rethinkdb.js';
+import {
+  getCurrentBillNumber,
+  setCurrentBillNumber,
+} from './settingModel.js';
 
 const INVOICES = 'invoices';
-const SETTINGS = 'app_settings';
 const PDFS = 'invoice_pdfs';
 
 export async function getInvoices() {
@@ -17,8 +20,7 @@ export async function getInvoice(invoiceId) {
 }
 
 export async function getNextBillNumber() {
-  const setting = await r.table(SETTINGS).get('current_bill_number').run();
-  return Number(setting?.value ?? 127) + 1;
+  return (await getCurrentBillNumber()) + 1;
 }
 
 export async function createInvoice(invoiceData) {
@@ -37,10 +39,7 @@ export async function createInvoice(invoiceData) {
 
   const currentBillNumber = (await getNextBillNumber()) - 1;
   if (Number(invoice.bill_number) >= currentBillNumber) {
-    await r.table(SETTINGS).insert({
-      id: 'current_bill_number',
-      value: Number(invoice.bill_number),
-    }, { conflict: 'update' }).run();
+    await setCurrentBillNumber(Number(invoice.bill_number));
   }
   return [invoice];
 }

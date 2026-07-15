@@ -7,6 +7,7 @@ import express from "express";
 import registerAuthRoutes, { requireSession } from "./api/rest/auth.js";
 import registerCompanyRoutes from "./api/rest/company.js";
 import registerInvoiceRoutes from "./api/rest/invoice.js";
+import registerSettingRoutes from "./api/rest/setting.js";
 import registerUserRoutes from "./api/rest/user.js";
 import { initializeDatabase } from "./init/index.js";
 
@@ -28,6 +29,7 @@ registerAuthRoutes(app);
 app.use("/api", requireSession);
 registerCompanyRoutes(app);
 registerInvoiceRoutes(app);
+registerSettingRoutes(app);
 registerUserRoutes(app);
 
 const frontendDist = path.join(projectRoot, "frontend", "dist");
