@@ -1,44 +1,74 @@
-import { Routes, Route, Link } from 'react-router-dom';
+import { NavLink, Route, Routes } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { logout } from '../store/authSlice';
+import {
+  Building2,
+  FilePlus2,
+  Files,
+  Flame,
+  LogOut,
+  ShieldCheck,
+  UsersRound,
+} from 'lucide-react';
+import { clearSession } from '../store/authSlice';
+import { apiFetch } from '../api';
 import InvoiceEditor from './InvoiceEditor';
 import ViewInvoices from './ViewInvoices';
+import Companies from './Companies';
+import Users from './Users';
+
+const navClass = ({ isActive }) => `nav-link${isActive ? ' nav-link-active' : ''}`;
 
 export default function Dashboard() {
   const dispatch = useDispatch();
-  const { user, isAdmin } = useSelector(state => state.auth);
+  const { user, isAdmin, isSuperAdmin } = useSelector((state) => state.auth);
+
+  const handleLogout = async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST', sessionAware: false }).catch(() => {});
+    localStorage.removeItem('vekanSessionExpiresAt');
+    dispatch(clearSession());
+  };
 
   return (
     <div className="app-container">
-      <div className="sidebar">
-        <h2 style={{ color: 'var(--accent)', marginBottom: '30px' }}>Vekan Tech</h2>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none' }}>View Invoices</Link>
-          <Link to="/dashboard/create" style={{ color: 'white', textDecoration: 'none' }}>Create Invoice</Link>
-          <Link to="/dashboard/edit" style={{ color: 'white', textDecoration: 'none' }}>Edit Invoice</Link>
-          <Link to="/dashboard/delete" style={{ color: 'white', textDecoration: 'none' }}>Delete Invoice</Link>
-          {isAdmin && (
-            <Link to="/dashboard/admin" style={{ color: 'var(--accent)', textDecoration: 'none', marginTop: '20px' }}>
-              Admin Approvals
-            </Link>
-          )}
-        </nav>
-        <div style={{ position: 'absolute', bottom: '20px' }}>
-          <p style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>{user.email}</p>
-          <button className="btn-primary" onClick={() => dispatch(logout())} style={{ padding: '5px 10px', fontSize: '0.9em' }}>
-            Logout
-          </button>
+      <aside className="sidebar">
+        <div className="brand-lockup">
+          <span className="brand-mark"><Flame size={22} strokeWidth={2.4} /></span>
+          <span><strong>Vekan Tech</strong><small>Fire & Safety Services</small></span>
         </div>
-      </div>
-      <div className="main-content">
-        <Routes>
-          <Route path="/" element={<ViewInvoices />} />
-          <Route path="/create" element={<InvoiceEditor />} />
-          <Route path="/edit" element={<div className="glass-panel"><h2>Edit Invoice</h2></div>} />
-          <Route path="/delete" element={<div className="glass-panel"><h2>Delete Invoice</h2></div>} />
-          <Route path="/admin" element={<div className="glass-panel"><h2>Admin Dashboard</h2><p>Pending user approvals...</p></div>} />
-        </Routes>
-      </div>
+
+        <div className="sidebar-status"><ShieldCheck size={18} /><span>Protection operations</span></div>
+
+        <nav className="sidebar-nav" aria-label="Dashboard navigation">
+          <span className="nav-section-label">Workspace</span>
+          <NavLink to="/dashboard" end className={navClass}><Files size={18} />Invoices</NavLink>
+          <NavLink to="/dashboard/create" className={navClass}><FilePlus2 size={18} />Create invoice</NavLink>
+          <NavLink to="/dashboard/companies" className={navClass}><Building2 size={18} />Companies</NavLink>
+          {isSuperAdmin && <NavLink to="/dashboard/users" className={navClass}><UsersRound size={18} />Users</NavLink>}
+          {isAdmin && <NavLink to="/dashboard/admin" className={navClass}><ShieldCheck size={18} />Admin approvals</NavLink>}
+        </nav>
+
+        <div className="sidebar-profile">
+          <span className="profile-avatar">{user.email.charAt(0).toUpperCase()}</span>
+          <span className="profile-copy"><strong>{user.email}</strong><small>{user.role.replace('_', ' ')}</small></span>
+          <button type="button" className="icon-button" onClick={handleLogout} aria-label="Log out" title="Log out"><LogOut size={18} /></button>
+        </div>
+      </aside>
+
+      <main className="dashboard-shell">
+        <header className="dashboard-topbar">
+          <div><span className="eyebrow">Vekan operations</span><strong>Fire protection, clearly documented.</strong></div>
+          <div className="service-pills"><span>Sprinklers</span><span>Hydrants</span><span>Hoses</span></div>
+        </header>
+        <div className="main-content">
+          <Routes>
+            <Route path="/" element={<ViewInvoices />} />
+            <Route path="/create" element={<InvoiceEditor />} />
+            <Route path="/companies" element={<Companies />} />
+            <Route path="/users" element={isSuperAdmin ? <Users /> : <div className="glass-panel"><h2>Access denied</h2></div>} />
+            <Route path="/admin" element={<div className="glass-panel"><span className="eyebrow">Administration</span><h2>Admin approvals</h2><p>Pending user approvals will appear here.</p></div>} />
+          </Routes>
+        </div>
+      </main>
     </div>
   );
 }

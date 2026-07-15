@@ -1,3 +1,0 @@
-ALTER TABLE public.invoices 
-ADD COLUMN IF NOT EXISTS seal_path TEXT,
-ADD COLUMN IF NOT EXISTS sign_path TEXT;

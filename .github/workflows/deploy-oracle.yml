@@ -1,0 +1,145 @@
+name: CI and Oracle deployment
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vekan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify frontend and backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Check backend syntax
+        working-directory: backend
+        run: npm run check
+
+      - name: Audit backend production dependencies
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Validate production image build
+        run: docker build --file deploy/oracle/Dockerfile --tag vekan-app:ci .
+
+  deploy:
+    name: Deploy to Oracle Cloud
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.APP_DOMAIN }}
+    concurrency:
+      group: vekan-oracle-production
+      cancel-in-progress: false
+    env:
+      SSH_HOST: ${{ secrets.ORACLE_HOST }}
+      SSH_USER: ${{ secrets.ORACLE_USER }}
+      SSH_PORT: ${{ secrets.ORACLE_SSH_PORT || '22' }}
+      DEPLOY_ROOT: /opt/vekan
+      RELEASE_SHA: ${{ github.sha }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        run: |
+          : "${SSH_HOST:?ORACLE_HOST secret is required}"
+          : "${SSH_USER:?ORACLE_USER secret is required}"
+          : "${APP_DOMAIN:?APP_DOMAIN variable is required}"
+          : "${CORS_ORIGIN:?CORS_ORIGIN variable is required}"
+          : "${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}"
+          : "${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          : "${SSH_PRIVATE_KEY:?ORACLE_SSH_PRIVATE_KEY secret is required}"
+          : "${SSH_KNOWN_HOSTS:?ORACLE_KNOWN_HOSTS secret is required}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Package release and production environment
+        run: |
+          umask 077
+          tar \
+            --exclude=.git \
+            --exclude='**/node_modules' \
+            --exclude=frontend/dist \
+            --exclude=backend/.env \
+            --exclude=release.tar.gz \
+            --exclude=production.env \
+            -czf release.tar.gz .
+          {
+            printf 'APP_DOMAIN=%s\n' "$APP_DOMAIN"
+            printf 'CORS_ORIGIN=%s\n' "$CORS_ORIGIN"
+            printf 'JWT_ACCESS_SECRET=%s\n' "$JWT_ACCESS_SECRET"
+            printf 'JWT_REFRESH_SECRET=%s\n' "$JWT_REFRESH_SECRET"
+            printf 'RETHINKDB_DB=vekan\n'
+            printf 'RETHINKDB_USER=admin\n'
+            printf 'RETHINKDB_PASSWORD=\n'
+          } > production.env
+
+      - name: Upload release
+        run: |
+          scp -P "$SSH_PORT" release.tar.gz production.env \
+            "$SSH_USER@$SSH_HOST:/tmp/"
+
+      - name: Activate release
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_ROOT='$DEPLOY_ROOT' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          mkdir -p "$DEPLOY_ROOT/releases/$RELEASE_SHA" "$DEPLOY_ROOT/shared"
+          tar -xzf /tmp/release.tar.gz -C "$DEPLOY_ROOT/releases/$RELEASE_SHA"
+          install -m 600 /tmp/production.env "$DEPLOY_ROOT/shared/production.env"
+          rm -f /tmp/release.tar.gz /tmp/production.env
+          bash "$DEPLOY_ROOT/releases/$RELEASE_SHA/deploy/oracle/deploy.sh" \
+            "$DEPLOY_ROOT" "$RELEASE_SHA" "$DEPLOY_ROOT/shared/production.env"
+          REMOTE

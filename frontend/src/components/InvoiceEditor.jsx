@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { apiFetch } from '../api';
 
 // Utility for number to words
 function numToWordsINR(num) {
@@ -21,11 +22,21 @@ function numToWordsINR(num) {
   return "Rupees " + str.trim();
 }
 
+function formatInvoiceDate(value) {
+  if (!value) return '';
+  const [year, month, day] = value.split('-');
+  return year && month && day ? `${day}-${month}-${year}` : value;
+}
+
 export default function InvoiceEditor() {
   const canvasRef = useRef(null);
 
   const [items, setItems] = useState([{ description: '', qty: 1, rate: 0, amount: 0 }]);
   const [toDetails, setToDetails] = useState('');
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [companySearch, setCompanySearch] = useState('');
+  const [showCompanyOptions, setShowCompanyOptions] = useState(false);
   
   const [header, setHeader] = useState({ 
     date: new Date().toISOString().split('T')[0], 
@@ -48,7 +59,7 @@ export default function InvoiceEditor() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchNextBill = () => {
-    fetch('http://127.0.0.1:8000/api/next_bill_number')
+    apiFetch('/api/next_bill_number')
       .then(res => res.json())
       .then(data => {
         if(data.next_bill_number) setHeader(h => ({ ...h, bill_no: data.next_bill_number }));
@@ -57,10 +68,15 @@ export default function InvoiceEditor() {
   };
 
   useEffect(() => {
+    apiFetch('/api/companies')
+      .then((response) => response.json())
+      .then((data) => setCompanies(data.companies || []))
+      .catch(console.error);
+
     // Check if we have an invoice ID in localStorage to load it (passed from ViewInvoices)
     const loadId = localStorage.getItem('loadInvoiceId');
     if (loadId) {
-      fetch(`http://127.0.0.1:8000/api/invoices/${loadId}`)
+      apiFetch(`/api/invoices/${loadId}`)
         .then(res => res.json())
         .then(data => {
           if (data.data) {
@@ -73,7 +89,18 @@ export default function InvoiceEditor() {
               po_date: inv.po_date || '',
               show_po: !!inv.po_number || !!inv.po_date
             });
-            setToDetails(inv.to_details || '');
+            const invoiceToDetails = inv.to_details || '';
+            setToDetails(invoiceToDetails);
+            if (invoiceToDetails) {
+              const lines = invoiceToDetails.split('\n');
+              const gstLine = lines.at(-1)?.replace(/^GSTIN?:\s*/i, '') || '';
+              setSelectedCompany({
+                id: inv.company_id || null,
+                name: lines[0] || '',
+                address: lines.slice(1, -1).join('\n'),
+                gst_number: gstLine,
+              });
+            }
             setItems(inv.items || []);
             setDroppedAssets({
               seal: inv.seal_path || null,
@@ -89,6 +116,27 @@ export default function InvoiceEditor() {
       fetchNextBill();
     }
   }, []);
+
+  const filteredCompanies = companies.filter((company) => {
+    const search = companySearch.trim().toLowerCase();
+    if (!search) return true;
+    return [company.name, company.address, company.gst_number]
+      .some((value) => value.toLowerCase().includes(search));
+  }).slice(0, 8);
+
+  const chooseCompany = (company) => {
+    setSelectedCompany(company);
+    setToDetails(`${company.name}\n${company.address}\nGSTIN: ${company.gst_number}`);
+    setCompanySearch('');
+    setShowCompanyOptions(false);
+  };
+
+  const clearCompany = () => {
+    setSelectedCompany(null);
+    setToDetails('');
+    setCompanySearch('');
+    setShowCompanyOptions(true);
+  };
 
   const availableAssets = [
     { id: 'seal1', type: 'seal', src: '/extracted_images/image1_2.png', name: 'Company Seal' },
@@ -134,6 +182,7 @@ export default function InvoiceEditor() {
       po_date: header.po_date,
       po_number: header.po_no,
       to_details: toDetails,
+      company_id: selectedCompany?.id || null,
       items: items,
       subtotal,
       sgst,
@@ -144,13 +193,13 @@ export default function InvoiceEditor() {
     };
 
     try {
-      const url = currentInvoiceId 
-        ? `http://127.0.0.1:8000/api/invoices/${currentInvoiceId}` 
-        : `http://127.0.0.1:8000/api/invoices`;
+      const url = currentInvoiceId
+        ? `/api/invoices/${currentInvoiceId}`
+        : '/api/invoices';
       
       const method = currentInvoiceId ? 'PUT' : 'POST';
       
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -164,18 +213,73 @@ export default function InvoiceEditor() {
       // 2. Prepare UI for PDF snapshot
       setIsGenerating(true);
       
-      // Wait for React to re-render with clean divs instead of inputs
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for the export-only view, fonts and letterhead images to settle.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       
-      // Generate PDF
-      const canvas = await html2canvas(canvasRef.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
+      // Capture the complete invoice, including content below the visible editor.
+      const invoiceElement = canvasRef.current;
+      await document.fonts?.ready;
+      await Promise.all(
+        [...invoiceElement.querySelectorAll('img')].map((image) => {
+          if (!image.complete) {
+            return new Promise((resolve) => {
+              image.addEventListener('load', resolve, { once: true });
+              image.addEventListener('error', resolve, { once: true });
+            });
+          }
+          return image.decode?.().catch(() => undefined);
+        }),
+      );
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: invoiceElement.scrollWidth,
+        height: invoiceElement.scrollHeight,
+        windowWidth: invoiceElement.scrollWidth,
+        windowHeight: invoiceElement.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      const margin = 5;
+      const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+      const pdfHeight = pdf.internal.pageSize.getHeight() - (margin * 2);
+      const pageHeightPx = Math.floor((pdfHeight * canvas.width) / pdfWidth);
+
+      // Slice tall invoices into A4-sized images. Drawing each source slice into
+      // its own canvas avoids jsPDF clipping the bottom of one oversized image.
+      let sourceY = 0;
+      let pageNumber = 0;
+      while (sourceY < canvas.height) {
+        const sliceHeight = Math.min(pageHeightPx, canvas.height - sourceY);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const context = pageCanvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        context.drawImage(
+          canvas,
+          0,
+          sourceY,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight,
+        );
+
+        if (pageNumber > 0) pdf.addPage();
+        const renderedHeight = (sliceHeight * pdfWidth) / canvas.width;
+        pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margin, margin, pdfWidth, renderedHeight);
+        sourceY += sliceHeight;
+        pageNumber += 1;
+      }
+
       pdf.save(`${header.bill_no}.pdf`);
       
     } catch (err) {
@@ -192,7 +296,7 @@ export default function InvoiceEditor() {
     <div style={{ display: 'flex', gap: '20px', height: '100%', overflow: 'hidden' }}>
       
       {/* Editor Main Canvas Wrapper */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#e5e7eb', padding: '20px', borderRadius: '12px' }}>
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#e5e7eb', padding: '20px', borderRadius: '12px' }}>
         
         <div style={{ width: '100%', maxWidth: '800px', display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div>
@@ -201,6 +305,8 @@ export default function InvoiceEditor() {
               fetchNextBill();
               setItems([{ description: '', qty: 1, rate: 0, amount: 0 }]);
               setToDetails('');
+              setSelectedCompany(null);
+              setCompanySearch('');
             }}>New Invoice</button>
           </div>
           <button className="btn-primary" onClick={handleGenerate} disabled={isGenerating} style={{ boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
@@ -209,10 +315,12 @@ export default function InvoiceEditor() {
         </div>
 
         {/* A4 Paper */}
-        <div ref={canvasRef} style={{
-          width: '800px',
-          minHeight: '1131px',
-          background: 'white',
+        <div ref={canvasRef} data-testid="invoice-canvas" style={{
+           width: '800px',
+           flex: '0 0 auto',
+           minHeight: '1131px',
+           boxSizing: 'border-box',
+           background: 'white',
           color: 'black',
           padding: '40px',
           boxShadow: isGenerating ? 'none' : '0 10px 25px rgba(0,0,0,0.2)',
@@ -220,43 +328,44 @@ export default function InvoiceEditor() {
         }}>
           
           {/* Header Row */}
-          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px', marginBottom: '20px' }}>
-            <div style={{ flex: '0 0 160px' }}>
-              <img src="/extracted_images/image1_1.jpeg" alt="Logo" style={{ width: '160px' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr) 80px', columnGap: '10px', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '12px', marginBottom: '20px' }}>
+            <div style={{ width: '120px', display: 'flex', justifyContent: 'center' }}>
+              <img src="/extracted_images/image1_1.jpeg" alt="Logo" style={{ width: '112px', maxHeight: '96px', objectFit: 'contain' }} />
             </div>
-            <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ minWidth: 0, textAlign: 'center' }}>
               {isGenerating ? (
                 <>
-                  <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#1a1acb' }}>{letterhead.name}</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>{letterhead.address}</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '2px' }}>{letterhead.phone}</div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '2px' }}>{letterhead.gstin}</div>
+                  <div data-testid="letterhead-name" style={{ fontSize: '42px', lineHeight: 1.08, letterSpacing: '-0.6px', fontWeight: 'bold', color: '#1a1acb', whiteSpace: 'nowrap' }}>{letterhead.name}</div>
+                  <div style={{ fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', marginTop: '6px', whiteSpace: 'nowrap' }}>{letterhead.address}</div>
+                  <div style={{ fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', marginTop: '2px', whiteSpace: 'nowrap' }}>{letterhead.phone}</div>
+                  <div style={{ fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', marginTop: '2px', whiteSpace: 'nowrap' }}>{letterhead.gstin}</div>
                 </>
               ) : (
                 <>
                   <input 
-                    style={{ width: '100%', fontSize: '48px', fontWeight: 'bold', color: '#1a1acb', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none' }} 
+                    aria-label="Company letterhead name"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: 0, fontSize: '42px', lineHeight: 1.08, letterSpacing: '-0.6px', fontWeight: 'bold', color: '#1a1acb', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none' }}
                     value={letterhead.name} 
                     onChange={e => setLetterhead({...letterhead, name: e.target.value})} 
                     onFocus={e => e.target.style.border = '1px dashed #ccc'}
                     onBlur={e => e.target.style.border = '1px dashed transparent'}
                   />
                   <input 
-                    style={{ width: '100%', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '5px' }} 
+                    style={{ width: '100%', boxSizing: 'border-box', padding: 0, fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '6px' }}
                     value={letterhead.address} 
                     onChange={e => setLetterhead({...letterhead, address: e.target.value})} 
                     onFocus={e => e.target.style.border = '1px dashed #ccc'}
                     onBlur={e => e.target.style.border = '1px dashed transparent'}
                   />
                   <input 
-                    style={{ width: '100%', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '2px' }} 
+                    style={{ width: '100%', boxSizing: 'border-box', padding: 0, fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '2px' }}
                     value={letterhead.phone} 
                     onChange={e => setLetterhead({...letterhead, phone: e.target.value})} 
                     onFocus={e => e.target.style.border = '1px dashed #ccc'}
                     onBlur={e => e.target.style.border = '1px dashed transparent'}
                   />
                   <input 
-                    style={{ width: '100%', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '2px' }} 
+                    style={{ width: '100%', boxSizing: 'border-box', padding: 0, fontSize: '14px', lineHeight: 1.25, fontWeight: 'bold', textAlign: 'center', border: '1px dashed transparent', background: 'transparent', outline: 'none', marginTop: '2px' }}
                     value={letterhead.gstin} 
                     onChange={e => setLetterhead({...letterhead, gstin: e.target.value})} 
                     onFocus={e => e.target.style.border = '1px dashed #ccc'}
@@ -265,7 +374,7 @@ export default function InvoiceEditor() {
                 </>
               )}
             </div>
-            <div style={{ flex: '0 0 160px' }}></div>
+            <div aria-hidden="true"></div>
           </div>
 
           {/* Sub Header */}
@@ -278,7 +387,7 @@ export default function InvoiceEditor() {
               <div style={{ display: 'flex', marginBottom: '4px' }}>
                 <span style={{ width: '60px' }}>Date:</span>
                 {isGenerating ? (
-                  <div style={{ flex: 1 }}>{header.date}</div>
+                  <div style={{ flex: 1 }}>{formatInvoiceDate(header.date)}</div>
                 ) : (
                   <input type="date" value={header.date} onChange={e => setHeader({...header, date: e.target.value})} style={{ border: '1px dashed transparent', background: 'transparent', outline: 'none', flex: 1, fontSize: '12px', fontWeight: 'bold', fontFamily: 'inherit' }} />
                 )}
@@ -305,7 +414,7 @@ export default function InvoiceEditor() {
                   <div style={{ display: 'flex', marginBottom: '4px' }}>
                     <span style={{ width: '60px' }}>PO. DATE:</span>
                     {isGenerating ? (
-                      <div style={{ flex: 1 }}>{header.po_date}</div>
+                      <div style={{ flex: 1 }}>{formatInvoiceDate(header.po_date)}</div>
                     ) : (
                       <input type="date" value={header.po_date} onChange={e => setHeader({...header, po_date: e.target.value})} style={{ border: '1px dashed transparent', background: 'transparent', outline: 'none', flex: 1, fontSize: '12px', fontWeight: 'bold', fontFamily: 'inherit' }} />
                     )}
@@ -322,19 +431,41 @@ export default function InvoiceEditor() {
           </div>
 
           {/* TO Section */}
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '20px', position: 'relative' }}>
             <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1a1acb', marginBottom: '5px' }}>TO</div>
-            {isGenerating ? (
-               <div style={{ width: '50%', fontSize: '12px', whiteSpace: 'pre-wrap' }}>{toDetails}</div>
-            ) : (
-              <textarea 
-                value={toDetails} 
-                onChange={e => setToDetails(e.target.value)}
-                placeholder="Company Name&#10;Address&#10;GSTIN"
-                style={{ width: '50%', height: '80px', border: '1px dashed #ccc', background: 'transparent', outline: 'none', fontSize: '12px', resize: 'none', fontFamily: 'inherit' }}
-                onFocus={e => e.target.style.border = '1px dashed #666'} 
-                onBlur={e => e.target.style.border = '1px dashed #ccc'}
-              />
+            {selectedCompany ? (
+              <div style={{ width: '55%', fontSize: '12px', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                  <span>{selectedCompany.name}</span>
+                  {!isGenerating && (
+                    <button type="button" onClick={clearCompany} aria-label="Remove selected company" title="Remove selected company" style={{ border: 0, background: '#fee2e2', color: '#b91c1c', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', lineHeight: '18px', padding: 0 }}>×</button>
+                  )}
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap' }}>{selectedCompany.address}</div>
+                <div>GSTIN: {selectedCompany.gst_number}</div>
+              </div>
+            ) : !isGenerating && (
+              <div style={{ width: '55%', position: 'relative' }}>
+                <input
+                  value={companySearch}
+                  onChange={(event) => { setCompanySearch(event.target.value); setShowCompanyOptions(true); }}
+                  onFocus={() => setShowCompanyOptions(true)}
+                  placeholder="Search company name, address or GST number"
+                  autoComplete="off"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 10px', border: '1px solid #9ca3af', borderRadius: '4px', fontSize: '12px' }}
+                />
+                {showCompanyOptions && (
+                  <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, maxHeight: '220px', overflowY: 'auto', background: 'white', border: '1px solid #d1d5db', boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}>
+                    {filteredCompanies.map((company) => (
+                      <button key={company.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => chooseCompany(company)} style={{ display: 'block', width: '100%', padding: '9px 10px', border: 0, borderBottom: '1px solid #e5e7eb', background: 'white', color: '#111827', textAlign: 'left', cursor: 'pointer' }}>
+                        <strong>{company.name}</strong>
+                        <div style={{ color: '#6b7280', fontSize: '11px' }}>{company.gst_number}</div>
+                      </button>
+                    ))}
+                    {!filteredCompanies.length && <div style={{ padding: '10px', color: '#6b7280' }}>No matching companies. Add one from the Companies menu.</div>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -408,10 +539,11 @@ export default function InvoiceEditor() {
           </div>
 
           {/* Footer - Signatures */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'start', marginTop: '40px' }}>
+            <div aria-hidden="true"></div>
             
             {/* Center Company Seal in Footer */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <div 
                 onDrop={(e) => handleDrop(e, 'seal')} 
                 onDragOver={handleDragOver}
@@ -426,7 +558,7 @@ export default function InvoiceEditor() {
             </div>
 
             {/* Signature Right Aligned */}
-            <div style={{ textAlign: 'center', width: '250px' }}>
+            <div style={{ textAlign: 'center', width: '100%' }}>
               <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '10px' }}>For {letterhead.name}</div>
               
               <div 

@@ -1,0 +1,10 @@
+.git
+.github
+**/node_modules
+frontend/dist
+backend/.env
+backend/.env.*
+!backend/.env.example
+*.log
+*.pdf
+deploy/oracle/README.md

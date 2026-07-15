@@ -1,0 +1,16 @@
+services:
+  rethinkdb:
+    build:
+      context: ./docker/rethinkdb
+    image: vekan-rethinkdb:2.4.4-local
+    container_name: vekan-rethinkdb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:39015:28015"
+      - "127.0.0.1:39080:8080"
+    volumes:
+      - vekan-rethinkdb-data:/data
+
+volumes:
+  vekan-rethinkdb-data:
+    name: vekan-rethinkdb-data

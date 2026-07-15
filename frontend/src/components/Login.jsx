@@ -1,65 +1,80 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { login } from '../store/authSlice';
+import { ArrowRight, Droplets, Flame, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { setSession } from '../store/authSlice';
+import { apiFetch } from '../api';
 
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Simulate Supabase login for now
-    if (email === 'vetrivelkvk@gmail.com' && password === '19972002@VkKeyan') {
-      dispatch(login({ email, role: 'admin' }));
-    } else {
-      // For testing, just let anyone in for now
-      dispatch(login({ email, role: 'user' }));
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const response = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        sessionAware: false,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Unable to sign in');
+      localStorage.setItem('vekanSessionExpiresAt', String(data.expiresAt));
+      dispatch(setSession({ ...data.user, expiresAt: data.expiresAt }));
+    } catch (loginError) {
+      setError(loginError.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <div className="glass-panel" style={{ width: '400px' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '20px', color: 'var(--accent)' }}>
-          {isLogin ? 'Welcome Back' : 'Create Account'}
-        </h2>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Email</label>
-            <input 
-              type="email" 
-              className="input-field" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+    <main className="login-page">
+      <section className="login-hero">
+        <div className="hero-orbit hero-orbit-one"></div>
+        <div className="hero-orbit hero-orbit-two"></div>
+        <div className="brand-lockup brand-lockup-light">
+          <span className="brand-mark"><Flame size={22} strokeWidth={2.4} /></span>
+          <span><strong>Vekan Tech</strong><small>Fire & Safety Services</small></span>
+        </div>
+
+        <div className="login-hero-copy">
+          <span className="hero-kicker"><ShieldCheck size={16} /> Protection operations</span>
+          <h1>Safety work.<br /><em>Clearly documented.</em></h1>
+          <p>Manage service invoices for fire sprinklers, hydrants and hose systems from one secure workspace.</p>
+          <div className="hero-services">
+            <span><Droplets size={16} /> Sprinkler systems</span>
+            <span><ShieldCheck size={16} /> Hydrant service</span>
+            <span><Flame size={16} /> Fire hose safety</span>
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Password</label>
-            <input 
-              type="password" 
-              className="input-field"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-          </div>
-          <button type="submit" className="btn-primary" style={{ marginTop: '10px' }}>
-            {isLogin ? 'Login' : 'Register'}
-          </button>
-        </form>
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9em' }}>
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <span 
-            style={{ color: 'var(--accent)', cursor: 'pointer' }}
-            onClick={() => setIsLogin(!isLogin)}
-          >
-            {isLogin ? 'Register' : 'Login'}
-          </span>
-        </p>
-      </div>
-    </div>
+        </div>
+
+        <div className="hero-proof"><strong>Always ready.</strong><span>Built for teams that protect people and property.</span></div>
+      </section>
+
+      <section className="login-panel">
+        <div className="login-card">
+          <span className="eyebrow">Secure workspace</span>
+          <h2>Welcome back</h2>
+          <p className="login-intro">Sign in to continue to the Vekan operations dashboard.</p>
+          <form onSubmit={handleSubmit} className="login-form">
+            <label htmlFor="login-email">Email address</label>
+            <div className="field-with-icon"><Mail size={18} /><input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="name@company.com" required /></div>
+            <label htmlFor="login-password">Password</label>
+            <div className="field-with-icon"><LockKeyhole size={18} /><input id="login-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="Enter your password" required /></div>
+            {error && <div className="notice notice-error">{error}</div>}
+            <button type="submit" className="login-submit" disabled={isSubmitting}>
+              <span>{isSubmitting ? 'Signing in...' : 'Enter workspace'}</span><ArrowRight size={19} />
+            </button>
+          </form>
+          <div className="login-security"><ShieldCheck size={17} /><span>Your session is protected with secure, HttpOnly authentication cookies.</span></div>
+        </div>
+      </section>
+    </main>
   );
 }
