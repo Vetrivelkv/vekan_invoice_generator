@@ -4,6 +4,7 @@ import { createMissingTables } from "./utils/create-missing-tables.js";
 
 const DEFAULT_EMAIL = "vetrivelkvk@gmail.com";
 const DEFAULT_PASSWORD = "19972002@VkKeyan";
+const DEFAULT_FULL_NAME = "Vetrivel K";
 
 export default async function createUsersAndSeedSuperAdmin() {
   try {
@@ -28,7 +29,10 @@ export default async function createUsersAndSeedSuperAdmin() {
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
     if (existingUser) {
       await users.get(existingUser.id).update({
+        full_name: DEFAULT_FULL_NAME,
         email: DEFAULT_EMAIL,
+        email_verified: true,
+        pending_email: null,
         password_hash: passwordHash,
         role: "super_admin",
         active: true,
@@ -37,7 +41,10 @@ export default async function createUsersAndSeedSuperAdmin() {
       console.log(`Updated default super admin: ${DEFAULT_EMAIL}`);
     } else {
       await users.insert({
+        full_name: DEFAULT_FULL_NAME,
         email: DEFAULT_EMAIL,
+        email_verified: true,
+        pending_email: null,
         password_hash: passwordHash,
         role: "super_admin",
         active: true,

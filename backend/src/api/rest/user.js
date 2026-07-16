@@ -7,9 +7,42 @@ const userLogic = new UserLogic();
 export default function registerUserRoutes(app) {
   app.get(
     "/api/users",
-    requireRole("super_admin"),
+    requireRole("super_admin", "admin"),
     asyncRoute(async (_request, response) => {
       response.json({ users: await userLogic.getAll() });
+    }),
+  );
+
+  app.post(
+    "/api/users",
+    requireRole("super_admin"),
+    asyncRoute(async (request, response) => {
+      response.status(201).json(await userLogic.create({
+        ...request.body,
+        actorId: request.user.id,
+      }));
+    }),
+  );
+
+  app.put(
+    "/api/users/:userId",
+    requireRole("super_admin"),
+    asyncRoute(async (request, response) => {
+      response.json(
+        await userLogic.update(
+          request.user,
+          request.params.userId,
+          request.body,
+        ),
+      );
+    }),
+  );
+
+  app.post(
+    "/api/users/:userId/resend-invitation",
+    requireRole("super_admin"),
+    asyncRoute(async (request, response) => {
+      response.json(await userLogic.resendInvitation(request.params.userId));
     }),
   );
 }

@@ -50,6 +50,17 @@ CORS_ORIGIN=https://<your-generated-railway-domain>
 
 Do not set `PORT`; Railway injects it automatically. Do not commit the JWT secrets.
 
+For account invitations, password setup, and verified email changes, also configure:
+
+```dotenv
+APP_PUBLIC_URL=https://vekaninvoicegenerator-production.up.railway.app
+RESEND_API_KEY=<your-resend-api-key>
+EMAIL_FROM=Vekan Tech <accounts@your-verified-sending-domain.com>
+ACCOUNT_TOKEN_EXPIRY_MINUTES=60
+```
+
+`RESEND_API_KEY` must exist only in Railway variables, never in GitHub. Railway Free and Hobby services must send through Resend's HTTPS API rather than SMTP. The default `onboarding@resend.dev` sender can only deliver to the email associated with the Resend account; verify a domain before inviting other addresses.
+
 5. Generate a public Railway domain for `vekan-app`.
 6. Replace `CORS_ORIGIN` with that exact HTTPS domain and redeploy once.
 7. After adding or changing `RETHINKDB_SERVERS`, deploy the staged variable changes and manually redeploy `vekan-app`. An already-failed container will not recover after exhausting its connection attempts.

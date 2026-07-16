@@ -237,6 +237,48 @@ button:disabled { cursor: not-allowed; opacity: 0.62; }
 .bill-number-preview strong { color: var(--safety-yellow); font-family: Georgia, "Times New Roman", serif; font-size: 1.65rem; }
 .settings-form .btn-primary { justify-self: start; margin-top: 3px; }
 
+/* Users */
+.users-panel { max-width: 1080px; margin: 0 auto; }
+.users-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.users-heading h2 { margin: 6px 0 7px; }
+.users-heading p { margin: 0; color: var(--text-muted); }
+.user-editor { display: grid; gap: 18px; margin-top: 24px; padding: 21px; border: 1px solid var(--border); border-radius: 20px; background: #faf8f2; }
+.user-editor-title { display: flex; justify-content: space-between; gap: 20px; }
+.user-editor-title > div { display: grid; gap: 4px; }
+.user-editor-title span { color: var(--text-muted); font-size: .78rem; }
+.user-editor-close { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--text-muted); background: #fff; cursor: pointer; }
+.user-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.user-form-grid label { display: grid; gap: 7px; font-size: .76rem; font-weight: 800; }
+.user-form-grid label small { color: var(--text-muted); font-weight: 500; line-height: 1.4; }
+.active-control { display: flex !important; align-items: center; align-self: end; min-height: 47px; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.active-control input { width: 17px; height: 17px; accent-color: var(--accent); }
+.user-editor .btn-primary { justify-self: start; }
+.users-notice { margin-top: 18px; }
+.user-list { display: grid; gap: 10px; margin-top: 24px; }
+.user-card { display: grid; grid-template-columns: auto minmax(180px, 1fr) auto auto; align-items: center; gap: 14px; padding: 15px 16px; border: 1px solid var(--border); border-radius: 17px; background: #fff; }
+.user-card-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: var(--accent); background: var(--accent-soft); }
+.user-card-identity { display: grid; gap: 3px; min-width: 0; }
+.user-card-identity span, .user-card-identity small { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: .72rem; }
+.user-card-identity small { color: var(--accent); }
+.user-card-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.role-badge, .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border-radius: 999px; font-size: .62rem; font-weight: 800; }
+.role-badge { color: #fff; background: var(--surface-dark); }
+.status-verified { color: #27633d; background: #e4f4e9; }
+.status-pending { color: #835d08; background: #fff0c8; }
+.status-disabled { color: #8e241b; background: #fce0db; }
+.user-card-actions { display: flex; gap: 6px; }
+
+/* Account setup and email verification */
+.account-action-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 80% 10%, rgba(245,184,46,.2), transparent 28rem), var(--bg-color); }
+.account-action-card { width: min(100%, 520px); padding: clamp(28px, 6vw, 52px); border: 1px solid rgba(38,42,37,.08); border-radius: 30px; background: var(--panel-bg); box-shadow: var(--shadow); }
+.account-action-icon { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 20px; border-radius: 16px; color: #fff; background: var(--accent); }
+.account-action-card h1 { margin: 10px 0 12px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.4rem, 7vw, 4rem); font-weight: 500; letter-spacing: -.045em; }
+.account-action-card p { color: var(--text-muted); line-height: 1.65; }
+.account-action-card form { display: grid; gap: 14px; }
+.account-action-card form label { display: grid; gap: 7px; font-size: .76rem; font-weight: 800; }
+.account-action-card .btn-primary { margin-top: 8px; }
+.account-action-link { margin-top: 10px; }
+
 /* Invoice archive */
 .archive-card { max-width: 1040px; margin: 0 auto; }
 .section-heading { display: flex; justify-content: space-between; gap: 25px; align-items: flex-end; padding: 5px 4px 27px; }
@@ -308,4 +350,8 @@ button:disabled { cursor: not-allowed; opacity: 0.62; }
   .invoice-amount { display: none; }
   .action-upload { margin-left: 0; }
   .service-pills { display: none; }
+  .users-heading { align-items: flex-start; }
+  .user-form-grid { grid-template-columns: 1fr; }
+  .user-card { grid-template-columns: auto 1fr; }
+  .user-card-badges, .user-card-actions { grid-column: 2; justify-content: flex-start; }
 }

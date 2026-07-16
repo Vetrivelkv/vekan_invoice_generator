@@ -1,7 +1,7 @@
 // Authentication business logic and cookie-session handling.
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { findUserByEmail } from '../models/userModel.js';
+import { findUserByEmail, findUserById } from '../models/userModel.js';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ACCESS_TOKEN_SECONDS = 15 * 60;
@@ -24,7 +24,12 @@ const cookieOptions = {
 };
 
 function publicUser(payload) {
-  return { id: payload.sub, email: payload.email, role: payload.role };
+  return {
+    id: payload.sub || payload.id,
+    full_name: payload.full_name,
+    email: payload.email,
+    role: payload.role,
+  };
 }
 
 function setSessionCookies(response, user, sessionExpiresAt) {
@@ -32,7 +37,12 @@ function setSessionCookies(response, user, sessionExpiresAt) {
   const remainingMs = Math.max(0, sessionExpiresAt - now);
   const remainingSeconds = Math.max(1, Math.floor(remainingMs / 1000));
   const accessSeconds = Math.min(ACCESS_TOKEN_SECONDS, remainingSeconds);
-  const claims = { email: user.email, role: user.role, sessionExpiresAt };
+  const claims = {
+    full_name: user.full_name,
+    email: user.email,
+    role: user.role,
+    sessionExpiresAt,
+  };
   const accessToken = jwt.sign(claims, accessSecret, {
     subject: user.id,
     expiresIn: accessSeconds,
@@ -50,8 +60,13 @@ export async function verifyCredentials(email, password) {
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail || !password) return null;
   const user = await findUserByEmail(normalizedEmail);
-  if (!user?.active || !await bcrypt.compare(password, user.password_hash)) return null;
-  return { id: user.id, email: user.email, role: user.role };
+  if (
+    !user?.active
+    || !user.email_verified
+    || !user.password_hash
+    || !await bcrypt.compare(password, user.password_hash)
+  ) return null;
+  return publicUser(user);
 }
 
 export function createSession(response, user) {
@@ -85,14 +100,22 @@ function readSession(request, response) {
   return { user, expiresAt: payload.sessionExpiresAt };
 }
 
-export function requireSession(request, response, next) {
+export async function requireSession(request, response, next) {
   try {
     const session = readSession(request, response);
     if (!session) {
       clearSession(response);
       return response.status(401).json({ code: 'SESSION_EXPIRED', detail: 'Your session has expired.' });
     }
-    request.user = session.user;
+    const currentUser = await findUserById(session.user.id);
+    if (!currentUser?.active || !currentUser.email_verified) {
+      clearSession(response);
+      return response.status(401).json({
+        code: 'SESSION_EXPIRED',
+        detail: 'Your session has expired.',
+      });
+    }
+    request.user = publicUser(currentUser);
     request.sessionExpiresAt = session.expiresAt;
     next();
   } catch (_error) {
