@@ -54,12 +54,13 @@ For account invitations, password setup, and verified email changes, also config
 
 ```dotenv
 APP_PUBLIC_URL=https://vekaninvoicegenerator-production.up.railway.app
-RESEND_API_KEY=<your-resend-api-key>
-EMAIL_FROM=Vekan Tech <accounts@your-verified-sending-domain.com>
+BREVO_API_KEY=<your-brevo-api-key>
+EMAIL_FROM_NAME=Vekan Tech
+EMAIL_FROM_ADDRESS=vetrivelkvk@gmail.com
 ACCOUNT_TOKEN_EXPIRY_MINUTES=60
 ```
 
-`RESEND_API_KEY` must exist only in Railway variables, never in GitHub. Railway Free and Hobby services must send through Resend's HTTPS API rather than SMTP. The default `onboarding@resend.dev` sender can only deliver to the email associated with the Resend account; verify a domain before inviting other addresses.
+`BREVO_API_KEY` must exist only in Railway variables, never in GitHub. Railway Free and Hobby services use Brevo's HTTPS transactional-email API rather than SMTP. Register and verify `EMAIL_FROM_ADDRESS` as a Brevo sender before sending account invitations.
 
 5. Generate a public Railway domain for `vekan-app`.
 6. Replace `CORS_ORIGIN` with that exact HTTPS domain and redeploy once.

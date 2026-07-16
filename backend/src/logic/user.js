@@ -43,7 +43,7 @@ async function deliverSetupEmail(user) {
     });
   } catch (error) {
     console.error(`Unable to send account setup email to ${user.email}:`, error.message);
-    return { sent: false };
+    return { sent: false, error: error.message };
   }
 }
 
@@ -61,7 +61,7 @@ async function deliverEmailChange(user, pendingEmail) {
     });
   } catch (error) {
     console.error(`Unable to send email verification to ${pendingEmail}:`, error.message);
-    return { sent: false };
+    return { sent: false, error: error.message };
   }
 }
 
@@ -93,6 +93,7 @@ export default class UserLogic {
     return {
       user: userModel.publicUser(user),
       email_sent: delivery.sent,
+      email_error: delivery.error || null,
     };
   }
 
@@ -140,10 +141,11 @@ export default class UserLogic {
     return {
       user: userModel.publicUser(updated),
       email_sent: delivery?.sent ?? null,
+      email_error: delivery?.error || null,
     };
   }
 
-  async resendInvitation(userId) {
+  async sendVerificationEmail(userId) {
     const user = await userModel.findUserById(userId);
     if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
     if (user.email_verified && !user.pending_email) {
@@ -153,6 +155,9 @@ export default class UserLogic {
     const delivery = user.pending_email
       ? await deliverEmailChange(user, user.pending_email)
       : await deliverSetupEmail(user);
-    return { email_sent: delivery.sent };
+    return {
+      email_sent: delivery.sent,
+      email_error: delivery.error || null,
+    };
   }
 }

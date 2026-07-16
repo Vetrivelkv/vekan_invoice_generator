@@ -85,7 +85,7 @@ export default function Users() {
       resetForm();
       setMessage(
         data.email_sent === false
-          ? "User saved, but the email could not be sent. Check the Resend configuration and use Resend invitation."
+          ? `User saved, but the email could not be sent. ${data.email_error || "Check the Brevo configuration and send the verification again."}`
           : isEditing
             ? "User updated successfully. Email changes remain pending until verified."
             : "User created and the password setup email was sent.",
@@ -97,16 +97,16 @@ export default function Users() {
     }
   };
 
-  const resendInvitation = async (user) => {
+  const sendVerification = async (user) => {
     setError("");
     setMessage("");
     try {
-      const response = await apiFetch(`/api/users/${user.id}/resend-invitation`, {
+      const response = await apiFetch(`/api/users/${user.id}/send-verification`, {
         method: "POST",
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Unable to resend email");
-      if (!data.email_sent) throw new Error("The email provider rejected the request. Check the Railway email variables and verified Resend domain.");
+      if (!response.ok) throw new Error(data.detail || "Unable to send verification email");
+      if (!data.email_sent) throw new Error(data.email_error || "Brevo rejected the request. Check the Railway BREVO_API_KEY and sender address.");
       setMessage(`Verification email sent to ${user.pending_email || user.email}.`);
     } catch (sendError) {
       setError(sendError.message);
@@ -223,8 +223,8 @@ export default function Users() {
                     <Pencil size={14} /> Edit
                   </button>
                   {(!user.email_verified || user.pending_email) && (
-                    <button className="action-button" type="button" onClick={() => resendInvitation(user)}>
-                      <RefreshCw size={14} /> Resend
+                    <button className="action-button" type="button" onClick={() => sendVerification(user)}>
+                      <RefreshCw size={14} /> Send verification
                     </button>
                   )}
                 </div>

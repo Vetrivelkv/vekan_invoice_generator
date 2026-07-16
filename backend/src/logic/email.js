@@ -1,4 +1,4 @@
-const resendEndpoint = "https://api.resend.com/emails";
+const brevoEndpoint = "https://api.brevo.com/v3/smtp/email";
 
 function escapeHtml(value) {
   return String(value)
@@ -21,27 +21,31 @@ async function sendEmail({ to, subject, html }) {
     return { sent: false, disabled: true };
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY is required to send account emails");
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) throw new Error("BREVO_API_KEY is required to send account emails");
 
-  const response = await fetch(resendEndpoint, {
+  const response = await fetch(brevoEndpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "api-key": apiKey,
+      accept: "application/json",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM || "Vekan Tech <onboarding@resend.dev>",
-      to: [to],
+      sender: {
+        name: process.env.EMAIL_FROM_NAME || "Vekan Tech",
+        email: process.env.EMAIL_FROM_ADDRESS || "vetrivelkvk@gmail.com",
+      },
+      to: [{ email: to }],
       subject,
-      html,
+      htmlContent: html,
     }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body.message || "Resend rejected the email request");
+    throw new Error(body.message || "Brevo rejected the email request");
   }
-  return { sent: true, id: body.id };
+  return { sent: true, id: body.messageId };
 }
 
 export function sendAccountSetupEmail({ email, fullName, token }) {
