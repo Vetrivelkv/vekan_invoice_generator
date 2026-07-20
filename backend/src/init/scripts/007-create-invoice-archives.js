@@ -1,6 +1,7 @@
 import { createMissingTables } from "./utils/create-missing-tables.js";
+import { r } from "../../config/rethinkdb.js";
 
-export default async function createInvoiceArchives(r) {
+export default async function createInvoiceArchives() {
   await createMissingTables(["invoice_archives"]);
 
   const indexes = await r.table("invoice_archives").indexList().run();
