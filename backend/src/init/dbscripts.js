@@ -4,6 +4,7 @@ import seedSettings from "./scripts/003-seed-settings.js";
 import createUsersAndSeedSuperAdmin from "./scripts/004-create-users-and-seed-super-admin.js";
 import enableInvoiceSoftDelete from "./scripts/005-enable-invoice-soft-delete.js";
 import enableUserInvitations from "./scripts/006-enable-user-invitations.js";
+import createInvoiceArchives from "./scripts/007-create-invoice-archives.js";
 
 export default [
   { key: "001-initial-create", applyScript: initialCreate },
@@ -20,5 +21,9 @@ export default [
   {
     key: "006-enable-user-invitations",
     applyScript: enableUserInvitations,
+  },
+  {
+    key: "007-create-invoice-archives",
+    applyScript: createInvoiceArchives,
   },
 ];

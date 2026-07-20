@@ -8,6 +8,7 @@ import registerAccountRoutes from "./api/rest/account.js";
 import registerAuthRoutes, { requireSession } from "./api/rest/auth.js";
 import registerCompanyRoutes from "./api/rest/company.js";
 import registerInvoiceRoutes from "./api/rest/invoice.js";
+import registerInvoiceArchiveRoutes from "./api/rest/invoiceArchive.js";
 import registerSettingRoutes from "./api/rest/setting.js";
 import registerUserRoutes from "./api/rest/user.js";
 import { initializeDatabase } from "./init/index.js";
@@ -31,6 +32,7 @@ registerAccountRoutes(app);
 app.use("/api", requireSession);
 registerCompanyRoutes(app);
 registerInvoiceRoutes(app);
+registerInvoiceArchiveRoutes(app);
 registerSettingRoutes(app);
 registerUserRoutes(app);
 

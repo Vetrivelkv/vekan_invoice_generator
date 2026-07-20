@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   Download,
+  Eye,
+  FileUp,
   FileText,
   Folder,
   FolderOpen,
@@ -19,10 +21,15 @@ const monthNames = Array.from({ length: 12 }, (_, index) =>
 
 export default function ViewInvoices() {
   const [history, setHistory] = useState([]);
+  const [archivedDocuments, setArchivedDocuments] = useState([]);
   const [expandedYears, setExpandedYears] = useState({});
   const [expandedMonths, setExpandedMonths] = useState({});
   const [expandedInvoices, setExpandedInvoices] = useState({});
   const [uploadingId, setUploadingId] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importYear, setImportYear] = useState(new Date().getFullYear());
+  const [importMonth, setImportMonth] = useState(new Date().getMonth() + 1);
+  const [importMessage, setImportMessage] = useState('');
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -31,10 +38,18 @@ export default function ViewInvoices() {
   const fetchHistory = async () => {
     try {
       setError('');
-      const response = await apiFetch('/api/invoices');
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Unable to load invoices');
-      setHistory(data.invoices || []);
+      const [invoiceResponse, archiveResponse] = await Promise.all([
+        apiFetch('/api/invoices'),
+        apiFetch('/api/invoice-archives'),
+      ]);
+      const [invoiceData, archiveData] = await Promise.all([
+        invoiceResponse.json(),
+        archiveResponse.json(),
+      ]);
+      if (!invoiceResponse.ok) throw new Error(invoiceData.detail || 'Unable to load invoices');
+      if (!archiveResponse.ok) throw new Error(archiveData.detail || 'Unable to load archived PDFs');
+      setHistory(invoiceData.invoices || []);
+      setArchivedDocuments(archiveData.documents || []);
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -59,6 +74,20 @@ export default function ViewInvoices() {
     });
     return groups;
   }, [history]);
+
+  const groupedArchives = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const groups = {};
+    for (let year = currentYear; year >= FIRST_ARCHIVE_YEAR; year -= 1) {
+      groups[year] = Array.from({ length: 12 }, () => []);
+    }
+    archivedDocuments.forEach((document) => {
+      if (groups[document.year] && document.month >= 1 && document.month <= 12) {
+        groups[document.year][document.month - 1].push(document);
+      }
+    });
+    return groups;
+  }, [archivedDocuments]);
 
   const years = Object.keys(groupedHistory).map(Number).sort((a, b) => b - a);
   const toggleYear = (year) => setExpandedYears((current) => ({ ...current, [year]: !current[year] }));
@@ -111,6 +140,36 @@ export default function ViewInvoices() {
     }
   };
 
+  const handleArchiveImport = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setImporting(true);
+    setError('');
+    setImportMessage('');
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    formData.append('year', String(importYear));
+    formData.append('month', String(importMonth));
+    try {
+      const response = await apiFetch('/api/invoice-archives', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'PDF import failed');
+      const duplicateText = data.skipped
+        ? `; ${data.skipped} duplicate${data.skipped === 1 ? '' : 's'} skipped`
+        : '';
+      setImportMessage(`${data.created} PDF${data.created === 1 ? '' : 's'} imported${duplicateText}.`);
+      await fetchHistory();
+    } catch (importError) {
+      setError(importError.message);
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
+  };
+
   return (
     <section className="archive-card">
       <div className="section-heading">
@@ -119,14 +178,34 @@ export default function ViewInvoices() {
           <h1>Service records</h1>
           <p>Browse, update and manage every fire-safety service invoice.</p>
         </div>
-        <div className="record-count"><strong>{history.length}</strong><span>active records</span></div>
+        <div className="record-count"><strong>{history.length + archivedDocuments.length}</strong><span>active records</span></div>
       </div>
 
       {error && <div className="notice notice-error">{error}</div>}
+      {importMessage && <div className="notice notice-success">{importMessage}</div>}
+      <div className="archive-import">
+        <div>
+          <strong>Import historical PDF bills</strong>
+          <span>Select the destination year and month, then choose one or more PDFs.</span>
+        </div>
+        <div className="archive-import-controls">
+          <select aria-label="Archive year" value={importYear} onChange={(event) => setImportYear(Number(event.target.value))}>
+            {years.map((year) => <option value={year} key={year}>{year}</option>)}
+          </select>
+          <select aria-label="Archive month" value={importMonth} onChange={(event) => setImportMonth(Number(event.target.value))}>
+            {monthNames.map((month, index) => <option value={index + 1} key={month}>{month}</option>)}
+          </select>
+          <label className="action-button action-upload">
+            <FileUp size={16} /> {importing ? 'Importing...' : 'Choose PDFs'}
+            <input type="file" accept="application/pdf" multiple hidden disabled={importing} onChange={handleArchiveImport} />
+          </label>
+        </div>
+      </div>
       {isLoading && <div className="empty-state">Loading invoice archive...</div>}
 
       {!isLoading && years.map((year) => {
-        const yearCount = groupedHistory[year].reduce((count, month) => count + month.length, 0);
+        const yearCount = groupedHistory[year].reduce((count, month) => count + month.length, 0)
+          + groupedArchives[year].reduce((count, month) => count + month.length, 0);
         const yearOpen = expandedYears[year];
         return (
           <div className="archive-year" key={year}>
@@ -140,6 +219,7 @@ export default function ViewInvoices() {
             {yearOpen && (
               <div className="archive-months">
                 {groupedHistory[year].map((invoices, monthIndex) => {
+                  const documents = groupedArchives[year][monthIndex];
                   const monthKey = `${year}-${monthIndex}`;
                   const monthOpen = expandedMonths[monthKey];
                   return (
@@ -147,12 +227,23 @@ export default function ViewInvoices() {
                       <button className="folder-row folder-row-month" type="button" onClick={() => toggleMonth(monthKey)}>
                         <span className="folder-icon">{monthOpen ? <FolderOpen size={18} /> : <Folder size={18} />}</span>
                         <span className="folder-label">{monthNames[monthIndex]}</span>
-                        <span className="folder-count">{invoices.length}</span>
+                        <span className="folder-count">{invoices.length + documents.length}</span>
                         <ChevronRight className={monthOpen ? 'chevron-open' : ''} size={17} />
                       </button>
 
                       {monthOpen && (
                         <div className="invoice-list">
+                          {[...documents].sort((a, b) => a.filename.localeCompare(b.filename)).map((document) => (
+                            <article className="invoice-record archived-pdf-record" key={`archive-${document.id}`}>
+                              <div className="invoice-record-summary">
+                                <span className="invoice-file-icon"><FileText size={19} /></span>
+                                <span><strong>{document.filename}</strong><small>Historical PDF · {Number(document.file_size || 0).toLocaleString('en-IN')} bytes</small></span>
+                                <a className="action-button" href={apiUrl(`/api/invoice-archives/${document.id}/pdf`)} target="_blank" rel="noreferrer">
+                                  <Eye size={15} /> View PDF
+                                </a>
+                              </div>
+                            </article>
+                          ))}
                           {[...invoices].sort((a, b) => b.bill_number - a.bill_number).map((invoice) => {
                             const invoiceOpen = expandedInvoices[invoice.id];
                             return (
@@ -186,7 +277,7 @@ export default function ViewInvoices() {
                               </article>
                             );
                           })}
-                          {!invoices.length && <div className="empty-month">No invoices in {monthNames[monthIndex]}.</div>}
+                          {!invoices.length && !documents.length && <div className="empty-month">No invoices in {monthNames[monthIndex]}.</div>}
                         </div>
                       )}
                     </div>
