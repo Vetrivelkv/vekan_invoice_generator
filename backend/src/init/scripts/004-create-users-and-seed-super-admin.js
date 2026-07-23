@@ -31,8 +31,6 @@ export default async function createUsersAndSeedSuperAdmin() {
       await users.get(existingUser.id).update({
         full_name: DEFAULT_FULL_NAME,
         email: DEFAULT_EMAIL,
-        email_verified: true,
-        pending_email: null,
         password_hash: passwordHash,
         role: "super_admin",
         active: true,
@@ -43,8 +41,6 @@ export default async function createUsersAndSeedSuperAdmin() {
       await users.insert({
         full_name: DEFAULT_FULL_NAME,
         email: DEFAULT_EMAIL,
-        email_verified: true,
-        pending_email: null,
         password_hash: passwordHash,
         role: "super_admin",
         active: true,

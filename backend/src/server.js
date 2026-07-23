@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import express from "express";
-import registerAccountRoutes from "./api/rest/account.js";
 import registerAuthRoutes, { requireSession } from "./api/rest/auth.js";
 import registerCompanyRoutes from "./api/rest/company.js";
 import registerInvoiceRoutes from "./api/rest/invoice.js";
@@ -27,7 +26,6 @@ app.use(cookieParser());
 
 app.get("/api/health", (_request, response) => response.json({ status: "ok" }));
 registerAuthRoutes(app);
-registerAccountRoutes(app);
 
 app.use("/api", requireSession);
 registerCompanyRoutes(app);

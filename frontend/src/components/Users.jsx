@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import {
-  MailCheck,
   Pencil,
   Plus,
-  RefreshCw,
   Save,
   UserRound,
   X,
@@ -18,6 +16,7 @@ const emptyForm = {
   email: "",
   role: "user",
   active: true,
+  password: "",
 };
 
 const roleLabel = (role) => role
@@ -56,9 +55,10 @@ export default function Users() {
     setForm({
       id: user.id,
       full_name: user.full_name || "",
-      email: user.pending_email || user.email,
+      email: user.email,
       role: user.role,
       active: user.active,
+      password: "",
     });
     setError("");
     setMessage("");
@@ -83,33 +83,11 @@ export default function Users() {
       if (!response.ok) throw new Error(data.detail || "Unable to save user");
       await loadUsers();
       resetForm();
-      setMessage(
-        data.email_sent === false
-          ? `User saved, but the email could not be sent. ${data.email_error || "Check the Brevo configuration and send the verification again."}`
-          : isEditing
-            ? "User updated successfully. Email changes remain pending until verified."
-            : "User created and the password setup email was sent.",
-      );
+      setMessage(isEditing ? "User updated successfully." : "User created successfully.");
     } catch (saveError) {
       setError(saveError.message);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const sendVerification = async (user) => {
-    setError("");
-    setMessage("");
-    try {
-      const response = await apiFetch(`/api/users/${user.id}/send-verification`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Unable to send verification email");
-      if (!data.email_sent) throw new Error(data.email_error || "Brevo rejected the request. Check the Railway BREVO_API_KEY and sender address.");
-      setMessage(`Verification email sent to ${user.pending_email || user.email}.`);
-    } catch (sendError) {
-      setError(sendError.message);
     }
   };
 
@@ -139,7 +117,7 @@ export default function Users() {
           <div className="user-editor-title">
             <div>
               <strong>{form.id ? "Edit user" : "Create user"}</strong>
-              <span>{form.id ? "Saved email changes require verification." : "A password setup invitation will be emailed."}</span>
+              <span>{form.id ? "Update account details or set a new password." : "Set the user's initial login password."}</span>
             </div>
             <button className="user-editor-close" type="button" onClick={resetForm} aria-label="Close user editor">
               <X size={18} />
@@ -178,6 +156,23 @@ export default function Users() {
               </select>
               {editingSelf && <small>Your own role can only be changed by another super admin.</small>}
             </label>
+            <label>
+              <span>{form.id ? "New password (optional)" : "Initial password"}</span>
+              <input
+                className="input-field"
+                type="password"
+                minLength="8"
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+                required={!form.id}
+                autoComplete="new-password"
+              />
+              <small>
+                {form.id
+                  ? "Leave blank to keep the current password."
+                  : "Use at least 8 characters and share it securely with the user."}
+              </small>
+            </label>
             <label className="active-control">
               <input
                 type="checkbox"
@@ -207,14 +202,10 @@ export default function Users() {
               <div className="user-card-identity">
                 <strong>{user.full_name}</strong>
                 <span>{user.email}</span>
-                {user.pending_email && <small>Pending email: {user.pending_email}</small>}
+                {!user.has_password && <small>Password not set</small>}
               </div>
               <div className="user-card-badges">
                 <span className="role-badge">{roleLabel(user.role)}</span>
-                <span className={`status-badge ${user.email_verified ? "status-verified" : "status-pending"}`}>
-                  {user.email_verified ? <MailCheck size={13} /> : null}
-                  {user.email_verified ? "Verified" : "Invitation pending"}
-                </span>
                 {!user.active && <span className="status-badge status-disabled">Inactive</span>}
               </div>
               {isSuperAdmin && (
@@ -222,11 +213,6 @@ export default function Users() {
                   <button className="action-button" type="button" onClick={() => editUser(user)}>
                     <Pencil size={14} /> Edit
                   </button>
-                  {(!user.email_verified || user.pending_email) && (
-                    <button className="action-button" type="button" onClick={() => sendVerification(user)}>
-                      <RefreshCw size={14} /> Send verification
-                    </button>
-                  )}
                 </div>
               )}
             </article>

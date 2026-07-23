@@ -16,23 +16,15 @@ export function findUserById(userId) {
 }
 
 export async function emailBelongsToAnotherUser(email, excludedUserId = null) {
-  const users = await r
-    .table(USERS)
-    .filter((user) =>
-      user("email")
-        .default("")
-        .eq(email)
-        .or(user("pending_email").default("").eq(email)),
-    )
-    .run();
+  const users = await r.table(USERS).getAll(email, { index: "email" }).run();
   return users.some((user) => user.id !== excludedUserId);
 }
 
 export async function getUsers() {
-  return r.table(USERS)
+  const users = await r.table(USERS)
     .orderBy({ index: "email" })
-    .without(...PRIVATE_FIELDS)
     .run();
+  return users.map(publicUser);
 }
 
 export async function createUser(user) {
@@ -54,7 +46,10 @@ export async function updateUser(userId, changes) {
 
 export function publicUser(user) {
   if (!user) return null;
-  return Object.fromEntries(
-    Object.entries(user).filter(([key]) => !PRIVATE_FIELDS.includes(key)),
-  );
+  return {
+    ...Object.fromEntries(
+      Object.entries(user).filter(([key]) => !PRIVATE_FIELDS.includes(key)),
+    ),
+    has_password: Boolean(user.password_hash),
+  };
 }

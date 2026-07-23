@@ -50,18 +50,6 @@ CORS_ORIGIN=https://<your-generated-railway-domain>
 
 Do not set `PORT`; Railway injects it automatically. Do not commit the JWT secrets.
 
-For account invitations, password setup, and verified email changes, also configure:
-
-```dotenv
-APP_PUBLIC_URL=https://vekaninvoicegenerator-production.up.railway.app
-BREVO_API_KEY=<your-brevo-api-key>
-EMAIL_FROM_NAME=Vekan Tech
-EMAIL_FROM_ADDRESS=vetrivelkvk@gmail.com
-ACCOUNT_TOKEN_EXPIRY_MINUTES=60
-```
-
-`BREVO_API_KEY` must exist only in Railway variables, never in GitHub. Railway Free and Hobby services use Brevo's HTTPS transactional-email API rather than SMTP. Register and verify `EMAIL_FROM_ADDRESS` as a Brevo sender before sending account invitations.
-
 5. Generate a public Railway domain for `vekan-app`.
 6. Replace `CORS_ORIGIN` with that exact HTTPS domain and redeploy once.
 7. After adding or changing `RETHINKDB_SERVERS`, deploy the staged variable changes and manually redeploy `vekan-app`. An already-failed container will not recover after exhausting its connection attempts.

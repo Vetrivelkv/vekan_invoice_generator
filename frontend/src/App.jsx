@@ -4,8 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import SessionExpiredModal from './components/SessionExpiredModal';
-import AccountSetup from './components/AccountSetup';
-import VerifyEmail from './components/VerifyEmail';
 import { clearSession, finishSessionCheck, setSession } from './store/authSlice';
 import { apiFetch, SESSION_EXPIRED_EVENT } from './api';
 
@@ -71,8 +69,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/account/setup" element={<AccountSetup />} />
-        <Route path="/account/verify-email" element={<VerifyEmail />} />
         <Route 
           path="/" 
           element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} 

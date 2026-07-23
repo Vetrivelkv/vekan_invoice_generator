@@ -38,11 +38,4 @@ export default function registerUserRoutes(app) {
     }),
   );
 
-  app.post(
-    "/api/users/:userId/send-verification",
-    requireRole("super_admin"),
-    asyncRoute(async (request, response) => {
-      response.json(await userLogic.sendVerificationEmail(request.params.userId));
-    }),
-  );
 }

@@ -62,7 +62,6 @@ export async function verifyCredentials(email, password) {
   const user = await findUserByEmail(normalizedEmail);
   if (
     !user?.active
-    || !user.email_verified
     || !user.password_hash
     || !await bcrypt.compare(password, user.password_hash)
   ) return null;
@@ -108,7 +107,7 @@ export async function requireSession(request, response, next) {
       return response.status(401).json({ code: 'SESSION_EXPIRED', detail: 'Your session has expired.' });
     }
     const currentUser = await findUserById(session.user.id);
-    if (!currentUser?.active || !currentUser.email_verified) {
+    if (!currentUser?.active) {
       clearSession(response);
       return response.status(401).json({
         code: 'SESSION_EXPIRED',
