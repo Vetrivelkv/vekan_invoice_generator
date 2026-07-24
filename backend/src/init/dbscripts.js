@@ -11,6 +11,7 @@ import number2018DecemberInvoiceArchives from "./scripts/011-number-2018-decembe
 import removeRabiaQuotationAndRenumberArchives from "./scripts/012-remove-rabia-quotation-and-renumber-archives.js";
 import number2019InvoiceArchivesThrough014 from "./scripts/013-number-2019-invoice-archives-through-014.js";
 import numberInvoiceArchivesThrough025 from "./scripts/014-number-invoice-archives-through-025.js";
+import remove2018Through2020InvoiceArchives from "./scripts/015-remove-2018-through-2020-invoice-archives.js";
 
 export default [
   { key: "001-initial-create", applyScript: initialCreate },
@@ -55,5 +56,9 @@ export default [
   {
     key: "014-number-invoice-archives-through-025",
     applyScript: numberInvoiceArchivesThrough025,
+  },
+  {
+    key: "015-remove-2018-through-2020-invoice-archives",
+    applyScript: remove2018Through2020InvoiceArchives,
   },
 ];
