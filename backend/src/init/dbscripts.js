@@ -5,6 +5,7 @@ import createUsersAndSeedSuperAdmin from "./scripts/004-create-users-and-seed-su
 import enableInvoiceSoftDelete from "./scripts/005-enable-invoice-soft-delete.js";
 import createInvoiceArchives from "./scripts/007-create-invoice-archives.js";
 import removeEmailFlow from "./scripts/008-remove-email-flow.js";
+import correct2018NovemberInvoiceArchives from "./scripts/009-correct-2018-november-invoice-archives.js";
 
 export default [
   { key: "001-initial-create", applyScript: initialCreate },
@@ -25,5 +26,9 @@ export default [
   {
     key: "008-remove-email-flow",
     applyScript: removeEmailFlow,
+  },
+  {
+    key: "009-correct-2018-november-invoice-archives",
+    applyScript: correct2018NovemberInvoiceArchives,
   },
 ];
