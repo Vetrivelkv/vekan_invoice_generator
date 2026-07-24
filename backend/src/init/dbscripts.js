@@ -6,6 +6,7 @@ import enableInvoiceSoftDelete from "./scripts/005-enable-invoice-soft-delete.js
 import createInvoiceArchives from "./scripts/007-create-invoice-archives.js";
 import removeEmailFlow from "./scripts/008-remove-email-flow.js";
 import correct2018NovemberInvoiceArchives from "./scripts/009-correct-2018-november-invoice-archives.js";
+import remove2018SeptemberQuotationArchives from "./scripts/010-remove-2018-september-quotation-archives.js";
 
 export default [
   { key: "001-initial-create", applyScript: initialCreate },
@@ -30,5 +31,9 @@ export default [
   {
     key: "009-correct-2018-november-invoice-archives",
     applyScript: correct2018NovemberInvoiceArchives,
+  },
+  {
+    key: "010-remove-2018-september-quotation-archives",
+    applyScript: remove2018SeptemberQuotationArchives,
   },
 ];
