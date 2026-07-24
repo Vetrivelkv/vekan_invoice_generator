@@ -8,6 +8,7 @@ import removeEmailFlow from "./scripts/008-remove-email-flow.js";
 import correct2018NovemberInvoiceArchives from "./scripts/009-correct-2018-november-invoice-archives.js";
 import remove2018SeptemberQuotationArchives from "./scripts/010-remove-2018-september-quotation-archives.js";
 import number2018DecemberInvoiceArchives from "./scripts/011-number-2018-december-invoice-archives.js";
+import removeRabiaQuotationAndRenumberArchives from "./scripts/012-remove-rabia-quotation-and-renumber-archives.js";
 
 export default [
   { key: "001-initial-create", applyScript: initialCreate },
@@ -40,5 +41,9 @@ export default [
   {
     key: "011-number-2018-december-invoice-archives",
     applyScript: number2018DecemberInvoiceArchives,
+  },
+  {
+    key: "012-remove-rabia-quotation-and-renumber-archives",
+    applyScript: removeRabiaQuotationAndRenumberArchives,
   },
 ];
