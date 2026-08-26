@@ -39,6 +39,10 @@ jobs:
         working-directory: backend
         run: npm run check
 
+      - name: Test backend
+        working-directory: backend
+        run: npm test
+
       - name: Audit backend production dependencies
         working-directory: backend
         run: npm audit --omit=dev --audit-level=high
@@ -50,6 +54,10 @@ jobs:
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint
+
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
 
       - name: Build frontend
         working-directory: frontend

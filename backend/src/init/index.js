@@ -1,37 +1,77 @@
 import { databaseServers, r } from "../config/rethinkdb.js";
 import { runDatabaseScripts } from "./dbscript-runner.js";
-
-const sleep = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+import { withBoundedBackoff } from "../lib/retry.js";
 
 async function waitForRethinkDb() {
-  const maxAttempts = Number(process.env.RETHINKDB_INIT_MAX_ATTEMPTS) || 20;
-  const retryMilliseconds = Number(process.env.RETHINKDB_INIT_RETRY_MS) || 1000;
+  const maxAttempts = Number(process.env.RETHINKDB_INIT_MAX_ATTEMPTS) || 6;
+  const retryMilliseconds = Number(process.env.RETHINKDB_INIT_RETRY_MS) || 500;
+  const maxRetryMilliseconds = Number(process.env.RETHINKDB_INIT_MAX_RETRY_MS) || 5000;
   const targets = databaseServers
     .map(({ host, port }) => `${host}:${port}`)
     .join(", ");
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
+  await withBoundedBackoff(
+    async () => {
       await r.expr(1).run();
-      return;
-    } catch (error) {
-      const reason = [error.code, error.message]
-        .filter(Boolean)
-        .join(": ")
-        .replace(/\s+/g, " ");
-      console.warn(
-        `Unable to connect to RethinkDB at ${targets}. `
-          + `Attempt ${attempt}/${maxAttempts}. ${reason}`,
-      );
-      if (attempt === maxAttempts) throw error;
-      await sleep(retryMilliseconds);
-    }
-  }
+    },
+    {
+      attempts: maxAttempts,
+      initialDelayMs: retryMilliseconds,
+      maxDelayMs: maxRetryMilliseconds,
+      onRetry(error, attempt, delayMs) {
+        const reason = [error.code, error.message]
+          .filter(Boolean)
+          .join(": ")
+          .replace(/\s+/g, " ");
+        console.warn(
+          `Unable to connect to RethinkDB at ${targets}. `
+            + `Attempt ${attempt}/${maxAttempts}; retrying in ${delayMs}ms. ${reason}`,
+        );
+      },
+    },
+  );
 }
 
+let initializationPromise;
+let ready = false;
+let initializationError;
+
 export async function initializeDatabase() {
-  await waitForRethinkDb();
-  await runDatabaseScripts();
-  console.log("RethinkDB initialization scripts complete.");
+  if (ready) return;
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async () => {
+    await waitForRethinkDb();
+    await runDatabaseScripts();
+    ready = true;
+    initializationError = undefined;
+    console.log("RethinkDB initialization scripts complete.");
+  })().catch((error) => {
+    initializationError = error;
+    throw error;
+  }).finally(() => {
+    initializationPromise = undefined;
+  });
+
+  return initializationPromise;
+}
+
+export function getDatabaseReadiness() {
+  return {
+    ready,
+    initializing: Boolean(initializationPromise),
+    error: initializationError?.message,
+  };
+}
+
+export async function requireDatabaseReady(_request, response, next) {
+  try {
+    await initializeDatabase();
+    next();
+  } catch (error) {
+    response.status(503).json({
+      code: "DATABASE_UNAVAILABLE",
+      detail: "The database is waking up. Please try again shortly.",
+    });
+  }
 }

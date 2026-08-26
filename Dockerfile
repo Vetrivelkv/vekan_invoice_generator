@@ -1,6 +1,8 @@
 FROM node:22-bookworm-slim AS frontend-build
 
 WORKDIR /build/frontend
+ARG VITE_COLD_START_RETRY_MS=1500
+ENV VITE_COLD_START_RETRY_MS=${VITE_COLD_START_RETRY_MS}
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
