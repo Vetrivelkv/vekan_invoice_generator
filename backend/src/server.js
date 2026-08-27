@@ -28,6 +28,10 @@ const allowedOrigins = process.env.CORS_ORIGIN
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+app.use("/api", (_request, response, next) => {
+  response.set("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/api/health", (_request, response) => response.json({ status: "ok" }));
 app.get("/api/ready", (_request, response) => {
@@ -54,9 +58,20 @@ registerSettingRoutes(app);
 registerUserRoutes(app);
 
 const frontendDist = path.join(projectRoot, "frontend", "dist");
-app.use(express.static(frontendDist));
+app.use(express.static(frontendDist, {
+  setHeaders(response, filePath) {
+    if (filePath.endsWith("index.html")) {
+      response.setHeader("Cache-Control", "no-cache");
+    } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else {
+      response.setHeader("Cache-Control", "public, max-age=3600");
+    }
+  },
+}));
 app.get("*", (request, response, next) => {
   if (request.path.startsWith("/api/")) return next();
+  response.set("Cache-Control", "no-cache");
   response.sendFile(path.join(frontendDist, "index.html"));
 });
 
